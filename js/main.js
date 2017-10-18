@@ -1,3 +1,6 @@
+/*
+TODO Youtube video regex: /^(https?\:\/\/)?((www\.)?youtube\.com|youtu\.?be)\/.+$/
+*/
 $(function() {
     // Initialize Firebase
     var config = {
@@ -29,29 +32,36 @@ $(function() {
     // Firebase Authentication
 
     //Login Elements
-    const loginUsername = document.getElementById('loginUsername');
+    const loginEmail = document.getElementById('loginEmail');
     const loginPassword = document.getElementById('loginPassword');
     const btnLogin = document.getElementById('login-submit');
     const btnLogOut = document.getElementById('logout-submit');
 
     //Sign Up Elements
-    const signUpUsername = document.getElementById('signUpUsername');
+    const signUpName = document.getElementById('signUpName');
     const signUpEmail = document.getElementById('signUpEmail');
     const signUpPassword = document.getElementById('signUpPassword');
     const confirmPassword = document.getElementById('confirmPassword');
     const btnsignUp = document.getElementById('register-submit');
 
+    function writeUserData(user, email) {
+        firebase.database().ref('users/' + user).set({
+            displayName: user,
+            email: email
+        });
+        console.log('User added to Database');
+    }
+
     //Login Event
     btnLogin.addEventListener('click', e => {
         //Get username and pass
-        const username = loginUsername.value;
+        const username = loginEmail.value;
         const pass = loginPassword.value;
         const auth = firebase.auth();
 
         //Sign In
         const promise = auth.signInWithEmailAndPassword(username, pass);
         promise.catch(e => console.log(e.message));
-
     });
 
     //Sign Up Event
@@ -60,13 +70,46 @@ $(function() {
         Get email and pass
         TODO: Email verification
         */
+        const name = signUpName.value;
         const email = signUpEmail.value;
-        const pass = signUpPassword.value;
-        const auth = firebase.auth();
+        const password = signUpPassword.value;
+        const confirmpassword = confirmPassword.value;
 
-        //Sign in
-        const promise = auth.createUserWithEmailAndPassword(email, pass);
-        promise.catch(e => console.log(e.message));
+        // Confirm password authentication
+        if (password == confirmpassword) {
+
+            //SignIn Authentication
+            firebase.auth().createUserWithEmailAndPassword(email, password)
+                .then(function(user) {
+                    writeUserData(name, email);
+
+                    //Update Disply-name
+                    user.updateProfile({
+                      displayName: name
+                    })
+                }, function(error) {
+                    var errorCode = error.code;
+                    switch (errorCode) {
+                        // Weak password authentication
+                        case 'auth/weak-password':
+                            alert('The password is too weak.');
+                            break;
+                            // Duplicate email authentication
+                        case 'auth/email-already-in-use':
+                            alert('The email is already in use.');
+                            break;
+                            // Invalid email authentication
+                        case 'auth/invalid-email':
+                            alert('The email is invalid.');
+                            break;
+                        default:
+                            console.error(error);
+                            break;
+                    }
+                });
+        } else {
+            console.log('passwords don\'t match');
+        }
     });
 
     //Log Out Event
@@ -77,44 +120,51 @@ $(function() {
     //Log in log
     firebase.auth().onAuthStateChanged(firebaseUser => {
         if (firebaseUser) {
+
             console.log(firebaseUser);
+
+            //User information
+            var user = firebase.auth().currentUser;
+            var name;
+
+            if (user != null) {
+                name = user.displayName;
+            }
+
+            //Get Eelements
+            const ulList = document.getElementById('list');
+            const nameObject = document.getElementById('name');
+
+            //Content Display
+            nameObject.innerText = name;
+
+            //Create references
+            const dbRefObject = firebase.database().ref().child('users');
+            const dbRefList = dbRefObject.child(name)
+
+            //Sync databse value additions
+            dbRefList.on('child_added', snap => {
+                const li = document.createElement('li');
+                li.id = snap.key;
+                li.innerText = snap.key + ": " + snap.val();
+                ulList.appendChild(li);
+            });
+
+            //Sync database value changes
+            dbRefList.on('child_changed', snap => {
+                const liChanged = document.getElementById(snap.key);
+                liChanged.innerText = snap.key + ": " + snap.val();
+            });
+
+            //Sync database value removals
+            dbRefList.on('child_removed', snap => {
+                const liToRemove = document.getElementById(snap.key);
+                liToRemove.remove();
+            });
+
         } else {
             console.log('not logged in');
         }
-    });
-    //#Content Display
-
-    //Get Eelements
-    const preObject = document.getElementById('users');
-    const ulList = document.getElementById('list');
-
-    //Create references
-    const dbRefObject = firebase.database().ref().child('users');
-    const dbRefList = dbRefObject.child('user1')
-
-    //Sync objet changes
-    dbRefObject.on('value', snap => {
-        preObject.innertext = JSON.stringify(snap.val(), null, 3);
-    })
-
-    //Sync list changes
-    dbRefList.on('child_added', snap => {
-      const li = document.createElement('li');
-      li.id = snap.key;
-      li.innerText = snap.val();
-      ulList.appendChild(li);
-    });
-
-    //Sync database value changes
-    dbRefList.on('child_changed', snap => {
-      const liChanged = document.getElementById(snap.key);
-      liChanged.innerText = snap.val();
-    });
-
-    //Sync database value removals
-    dbRefList.on('child_removed', snap => {
-      const liToRemove = document.getElementById(snap.key);
-      liToRemove.remove();
     });
 
 });
