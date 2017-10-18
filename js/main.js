@@ -45,6 +45,7 @@ $(function() {
     const btnsignUp = document.getElementById('register-submit');
 
     function writeUserData(user, email) {
+      //TODO Use UID instead of user
         firebase.database().ref('users/' + user).set({
             displayName: user,
             email: email
